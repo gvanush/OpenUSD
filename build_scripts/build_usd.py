@@ -1036,6 +1036,32 @@ def InstallTBB_MacOS(context, force, buildArgs):
                        ("iPhone", "XR"),
                        ("IPHONEOS","XROS")])
 
+        if context.buildTarget == apple_utils.TARGET_IPHONE_SIMULATOR:
+            # Create iPhoneSimulator config from iOS config
+            shutil.copy(
+                src="build/ios.macos.inc",
+                dst="build/iphonesimulator.macos.inc")
+
+            PatchFile("build/iphonesimulator.macos.inc",
+                      [("ios","iphonesimulator"),
+                       ("iOS", "iPhoneSimulator"),
+                       ("iPhoneOS", "iPhoneSimulator"),
+                       ("?= 8.0", "?= 8.0")])
+
+            # iOS clang just reuses the macOS one,
+            # so it's easier to copy it directly.
+            shutil.copy(src="build/macos.clang.inc",
+                        dst="build/iphonesimulator.clang.inc")
+
+            # arm64-apple-iphonesimulator
+            # ios-arm64-simulator
+            PatchFile("build/iphonesimulator.clang.inc",
+                      [("ios","iphonesimulator"),
+                       ("-miphoneos-version-min=", "-target arm64-apple-ios17.5-simulator"),
+                       ("iOS", "iPhoneSimulator"),
+                       ("iPhone", "iPhoneSimulator"),
+                       ("$(IPHONEOS_DEPLOYMENT_TARGET)", "")])
+
         (primaryArch, secondaryArch) = apple_utils.GetTargetArchPair(context)
 
         # tbb uses different arch names
@@ -2255,7 +2281,7 @@ class InstallContext:
 
         # - Imaging
         self.buildImaging = (args.build_imaging == IMAGING or
-                             args.build_imaging == USD_IMAGING) and not embedded
+                             args.build_imaging == USD_IMAGING)
         self.enablePtex = self.buildImaging and args.enable_ptex
         self.enableOpenVDB = self.buildImaging and args.enable_openvdb
 
@@ -2410,9 +2436,6 @@ if MacOSTargetEmbedded(context):
         sys.exit(1)
     if "--tools" in sys.argv:
         PrintError("Cannot build tools for embedded build targets")
-        sys.exit(1)
-    if "--imaging" in sys.argv:
-        PrintError("Cannot build imaging for embedded build targets")
         sys.exit(1)
 
 # Error out if user explicitly specified building usdview without required
