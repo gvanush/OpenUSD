@@ -25,9 +25,10 @@ TARGET_X86 = "x86_64"
 TARGET_ARM64 = "arm64"
 TARGET_UNIVERSAL = "universal"
 TARGET_IOS = "iOS"
+TARGET_IOS_SIMULATOR = "iOSSimulator"
 TARGET_VISIONOS = "visionOS"
 
-EMBEDDED_PLATFORMS = [TARGET_IOS, TARGET_VISIONOS]
+EMBEDDED_PLATFORMS = [TARGET_IOS, TARGET_IOS_SIMULATOR, TARGET_VISIONOS]
 
 def GetBuildTargets():
     return [TARGET_NATIVE,
@@ -35,6 +36,7 @@ def GetBuildTargets():
             TARGET_ARM64,
             TARGET_UNIVERSAL,
             TARGET_IOS,
+            TARGET_IOS_SIMULATOR,
             TARGET_VISIONOS]
 
 def GetBuildTargetDefault():
@@ -124,6 +126,8 @@ def GetSDKRoot(context) -> Optional[str]:
     sdk = "macosx"
     if context.buildTarget == TARGET_IOS:
         sdk = "iphoneos"
+    elif context.buildTarget == TARGET_IOS_SIMULATOR:
+        sdk = "iphonesimulator"
     elif context.buildTarget == TARGET_VISIONOS:
         sdk = "xros"
 
@@ -140,6 +144,7 @@ def SetTarget(context, targetName):
     context.targetARM64 = (targetName == GetTargetArmArch())
     context.targetUniversal = (targetName == TARGET_UNIVERSAL)
     context.targetIOS = (targetName == TARGET_IOS)
+    context.targetIOSSimulator = (targetName == TARGET_IOS_SIMULATOR)
     context.targetVisionOS = (targetName == TARGET_VISIONOS)
     if context.targetUniversal and not SupportsMacOSUniversalBinaries():
         context.targetUniversal = False
@@ -238,11 +243,18 @@ def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
 def ConfigureCMakeExtraArgs(context, args:List[str]) -> List[str]:
     system_name = None
     if TargetEmbeddedOS(context):
-        system_name = context.buildTarget
+        # CMake only recognizes "iOS", not "iOSSimulator"
+        # Differentiation comes from CMAKE_OSX_SYSROOT (iphoneos vs iphonesimulator)
+        if context.buildTarget in [TARGET_IOS, TARGET_IOS_SIMULATOR]:
+            system_name = "iOS"
+        else:
+            system_name = context.buildTarget
 
     if system_name:
         args.append(f"-DCMAKE_SYSTEM_NAME={system_name}")
         args.append(f"-DCMAKE_OSX_SYSROOT={GetSDKRoot(context)}")
+        # Set deployment target to match the app
+        args.append("-DCMAKE_OSX_DEPLOYMENT_TARGET=26.0")
 
         # Required to find locally built libs not from the sysroot.
         args.append(f"-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH")

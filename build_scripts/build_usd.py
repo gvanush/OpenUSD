@@ -1102,7 +1102,25 @@ def InstallTBB_MacOS(context, force, buildArgs):
             env = os.environ.copy()
             if MacOSTargetEmbedded(context):
                 env["SDKROOT"] = apple_utils.GetSDKRoot(context)
-                buildArgs.append(f' compiler=clang arch=arm64 extra_inc=big_iron.inc target={context.buildTarget.lower()}')
+                # Set iOS deployment target to match the app
+                env["IPHONEOS_DEPLOYMENT_TARGET"] = "26.0"
+
+                # TBB doesn't have separate ios-simulator target, use 'ios' for both device and simulator
+                tbbTarget = "ios" if context.buildTarget in [apple_utils.TARGET_IOS, apple_utils.TARGET_IOS_SIMULATOR] else context.buildTarget.lower()
+
+                # For iOS Simulator, add explicit platform targeting flags
+                if context.buildTarget == apple_utils.TARGET_IOS_SIMULATOR:
+                    # Explicitly target arm64-apple-ios-simulator platform with deployment target
+                    simulatorFlags = "-target arm64-apple-ios26.0-simulator"
+                    env["CFLAGS"] = env.get("CFLAGS", "") + " " + simulatorFlags
+                    env["CXXFLAGS"] = env.get("CXXFLAGS", "") + " " + simulatorFlags
+                else:
+                    # For device builds, set the deployment target explicitly
+                    deviceFlags = "-mios-version-min=26.0"
+                    env["CFLAGS"] = env.get("CFLAGS", "") + " " + deviceFlags
+                    env["CXXFLAGS"] = env.get("CXXFLAGS", "") + " " + deviceFlags
+
+                buildArgs.append(f' compiler=clang arch=arm64 extra_inc=big_iron.inc target={tbbTarget}')
             makeTBBCmd = 'make -j{procs} arch={arch} {buildArgs}'.format(
                 arch=arch, procs=context.numJobs,
                 buildArgs=" ".join(buildArgs))
