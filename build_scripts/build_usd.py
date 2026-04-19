@@ -1053,6 +1053,12 @@ def InstallTBB_Windows(context, force, buildArgs):
 
 def InstallTBB_MacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
+        # Fix C++20 incompatibility: enum kind_type lacks a fixed underlying type,
+        # making the out-of-range static const initialisers hard errors in C++20.
+        PatchFile("include/tbb/task.h",
+                [("    enum kind_type {",
+                  "    enum kind_type : int {")])
+
         # Ensure that the tbb build system picks the proper architecture.
         PatchFile("build/macos.clang.inc",
                 [("-m64",
